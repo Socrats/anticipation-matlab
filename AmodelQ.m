@@ -1,6 +1,6 @@
 %*****************
 % network inputs in order: dicator(10), reciever(2), Poff(1), w(1)
-% network outputs in order: prob_dict(9), prob_acc(1), Poff(1), w(1)
+% network outputs in order: prob_dict(10), prob_acc(1), Poff(1), w(1)
 %******************
 %clear;
 %% Build network
@@ -14,8 +14,6 @@ dnet.layers{2}.size = 13;
 dnet.layers{2}.transferFcn = 'logsig';
 dnet = init(dnet);
 dnet.trainParam.showWindow = false;
-% dnet.trainParam.goal = 1e-7;
-% dnet.trainFcn = 'trainbr';
 dnet.trainParam.epochs = 100;
 view(dnet);
 
@@ -26,7 +24,6 @@ future = 10;
 rounds = 100;
 k = 0.01;
 beta = 0.7;
-e = 0.005;           % Misimplementation probability
 discFactor = zeros(future,1);
 % discFactor(1) = 0.5;
 discFactor(1) = 1;
@@ -93,11 +90,7 @@ title('Aspiration level'),xlabel('epochs'),ylabel('Aspiration')
 for round = 1:rounds
     %% Reciever plays
     if acceptance == 0
-        % if rand() <= 0.5
-            acceptance = 1;
-        % else
-          %  acceptance = 0;
-        % end;
+        acceptance = 1;
     else
 %         if w(:,end) == 1
 %             acceptance = (a > 2);
@@ -110,7 +103,6 @@ for round = 1:rounds
         % acceptance = (a > datasample(0:4,1,'Weights',[0.2 0.5 0.15 0.1 0.05]));
         % acceptance = (a > datasample(0:4,1));
     end
-    % acceptance = y2(2,round);
     
     %% Update reciever
     out = dnet({[Ad(:,end);Ar(:,end);Poff(:,end);w(:,end)]});
@@ -133,9 +125,6 @@ for round = 1:rounds
             for i=2:future
                 out = dnet(X(1,i-1));
                 probD = out{1}(1:10);
-                % probD = softmax(probD);
-                % probD = abs(probD./sum(probD));
-                % acP = datasample(actions,1,'Weights',probD);
                 [~, acP] = max(probD);
                 dictator = ind2vec(acP,10);
                 Ract = (rand() <= out{1}(11));
@@ -147,43 +136,26 @@ for round = 1:rounds
                     payoff = 0;
                     dictator = zeros(10,1);
                 end;
-                % payoff = out{1}(11);
-                context = out{1}(13);
-                % predP(action,i) = payoff;  
+                context = out{1}(13); 
                 predP(action,i) = (10-acP)*acc;  
                 predA(action,i) = acc; 
                 X{1,i} = [dictator;recP;payoff;context];
             end;
         end;
 
-        % Computing payoffs
-        % utility = predP.*predA;
-        % utility = utility*discFactor;
-        predP
-        utility = predP*discFactor
-
+        utility = predP*discFactor;
         % Computing probabilities
         p = softmax(utility./k);
     end;
     %% Dictator plays
     if acceptance
         a = datasample(actions,1,'Weights',p);
-        %if rand() <= e
-        %    a = datasample(actions(actions~=a),1);
-        %end;
         ppoff = (Surp-a)./Surp;
         action_input = a;
         Dactions(round) = a;
     else
         ppoff = 0;
         action_input = 0;
-%         p(a) = 0;
-%         nsel = actions(actions~=a);
-%         if sum(p(nsel)) > 0
-%             p(nsel) = p(nsel)./sum(p(nsel)); % Problem if it reaches 0!!!
-%         else
-%             p(nsel) = 1./(nactions-1);
-%         end;
     end;
     % Compute prediction error
     errorp(round) = mse(acceptance - accProb);
@@ -196,34 +168,19 @@ for round = 1:rounds
     % Update
     Adt(:,end) = p;
     Art(:,end) = acceptance;
-% %     if mod(round,10)==1       
-% %         wtt = datasample([0 0.5 1],1);        
-% %     end;
-%     w = circshift(w, [0, -1]);
-%     w(:,end) = 1;
-%     % w(:,end) = wtt 
     Pofft(:,end) = ppoff;
     index(round) = Surp*ppoff;
     
     %% Training
-    %if round < 20
-        window = max(1,mepoch-round+1):mepoch;
-        inputs = [Ad(:,window);Ar(:,window);Poff(:,window);w(:,window)];
-        targets = [Adt(:,window);Art(:,window);Pofft(:,window);w(:,window)];
-        %[Xs,Xi,Ai,Ts] = preparets(dnet,mat2cell(inputs, size(inputs,1), ...
-        %        ones(1,size(inputs,2))),mat2cell(targets, size(targets,1), ...
-        %        ones(1,size(targets,2))));
-        %[dnet,Ys,Es,Xf,Yf,tr]  = adapt(dnet,Xs,Ts,Xi,Ai);
-        for i=1:400
-            [dnet,Ys,Es,Xf,Yf,tr]  = adapt(dnet,mat2cell(inputs, size(inputs,1), ...
-                ones(1,size(inputs,2))),mat2cell(targets, size(targets,1), ...
-                ones(1,size(targets,2))));
-        end;
-%         [dnet,Ys,Es,Xf,Yf,tr]  = train(dnet,mat2cell(inputs, size(inputs,1), ...
-%             ones(1,size(inputs,2))),mat2cell(targets, size(targets,1), ...
-%             ones(1,size(targets,2))),'useParallel','yes');
-         errort(round) = mse(Es);
-    %end
+    window = max(1,mepoch-round+1):mepoch;
+    inputs = [Ad(:,window);Ar(:,window);Poff(:,window);w(:,window)];
+    targets = [Adt(:,window);Art(:,window);Pofft(:,window);w(:,window)];
+    for i=1:400
+        [dnet,Ys,Es,Xf,Yf,tr]  = adapt(dnet,mat2cell(inputs, size(inputs,1), ...
+            ones(1,size(inputs,2))),mat2cell(targets, size(targets,1), ...
+            ones(1,size(targets,2))));
+    end;
+    errort(round) = mse(Es);
     %% Update Input micro-epoch
     % shift-left
     Ad = circshift(Ad, [0, -1]);
@@ -235,8 +192,6 @@ for round = 1:rounds
     else
         Ad(:,end) = zeros(10,1);
     end;
-    % Ar(:,end) = [1;0];
-    % Ar(:,end) = ind2vec(reciv+1,2);
     Ar(:,end) = ind2vec(acceptance+1,2);
     Poff(:,end) = Pofft(:,end); 
 %     if mod(round,5)==1       
@@ -267,18 +222,3 @@ for round = 1:rounds
     
 end;
 drawnow
-%% Plots
-% figure;
-% title('Dictator payoff'),xlabel('epochs'),ylabel('Payoff')
-% hold on
-% plot(index,'b');
-% plot(x2(1,:), 'r');
-% hold off
-% Uncomment these lines to enable various plots.
-% plot(index)
-% figure, plotperform(tr)
-% figure, plottrainstate(tr)
-% figure, plotregression(targets,outputs)
-% figure, plotresponse(targets,outputs)
-% figure, ploterrcorr(errors)
-% figure, plotinerrcorr(inputs,errors)

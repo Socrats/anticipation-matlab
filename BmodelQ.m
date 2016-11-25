@@ -14,8 +14,6 @@ dnet.layers{2}.size = 13;
 dnet.layers{2}.transferFcn = 'logsig';
 dnet = init(dnet);
 dnet.trainParam.showWindow = false;
-% dnet.trainParam.goal = 1e-7;
-% dnet.trainFcn = 'trainbr';
 dnet.trainParam.epochs = 100;
 % view(dnet);
 
@@ -26,7 +24,6 @@ Pmax = 9;
 Pmin = 0;
 Surp = 10;
 A = 9;
-% h = 0.2;
 l = 1;
 p = 0.1*ones(1,10);
 a = 6;
@@ -90,11 +87,7 @@ title('Aspiration level'),xlabel('epochs'),ylabel('Aspiration')
 for round=1:rounds   
     %% Reciever plays
     if acceptance == 0
-        % if rand() <= 0.5
-            acceptance = 1;
-        % else
-          %  acceptance = 0;
-        % end;
+        acceptance = 1;
     else
         %if w(:,end) == 1
         %    acceptance = (a > 2);
@@ -107,7 +100,6 @@ for round=1:rounds
         % acceptance = (a > datasample(0:4,1,'Weights',[0.2 0.5 0.15 0.1 0.05]));
         % acceptance = (a > datasample(0:4,1));
     end
-    % acceptance = y2(2,round);
     
     %% Select next action
     if action_input > 0
@@ -135,27 +127,21 @@ for round=1:rounds
         Dactions(round) = 0;
         action_input = 0;
     end;
-    % index(round) = payoff;
+
     % Compute prediction error
     errorp(round) = mse(acceptance - probR);
     
     %% Calculate probabilities
     A = payoffP;
-    % [~,atemp] = max(probD);
-    % A = atemp*probR;
     s = (payoff - A)/max(abs((Pmax - A)),abs((Pmin-A)));
-    % A = (1-h)*A + h*payoff;
-    % A = (1-h)*A + h*Poff;
     nsel = actions(actions~=a);
     if s >= 0 
         p(a) = p(a) + (1-p(a)).*s.*l;
-        % p(nsel) = p(nsel) - p(nsel).*s.*l;
     else
         p(a) = p(a) + p(a).*s.*l;
-        % p(nsel) = p(nsel) - (1-p(nsel)).*s.*l;
     end;
     if sum(p(nsel)) > 0
-        p(nsel) = (p(nsel)*(1-p(a)))./sum(p(nsel)); % Problem if it reaches 0!!!
+        p(nsel) = (p(nsel)*(1-p(a)))./sum(p(nsel));
     else
         p(nsel) = (1-p(a))./(nactions-1);
     end;
@@ -170,15 +156,7 @@ for round=1:rounds
     % Update
     Adt(:,end) = p;
     Art(:,end) = acceptance;
-%     if mod(round,5)==1       
-%         wtt = datasample([0 0.5 1],1);        
-%     end;
-%     w = circshift(w, [0, -1]);
-% %     w(:,end) = 1;
-%     w(:,end) = wtt 
-    % Pofft(:,end) = payoff/10;
     Pofft(:,end) = (payoff/10 + (round-1)*Pofft(:,end-1))/round;
-    % Pofft(:,end) = 
     index(round) = payoff;
     
     %% Training
@@ -186,20 +164,12 @@ for round=1:rounds
         window = max(1,mepoch-round+1):mepoch;
         inputs = [Ad(:,window);Ar(:,window);Poff(:,window);w(:,window)];
         targets = [Adt(:,window);Art(:,window);Pofft(:,window);w(:,window)];
-        %[Xs,Xi,Ai,Ts] = preparets(dnet,mat2cell(inputs, size(inputs,1), ...
-        %        ones(1,size(inputs,2))),mat2cell(targets, size(targets,1), ...
-        %        ones(1,size(targets,2))));
-        %[dnet,Ys,Es,Xf,Yf,tr]  = adapt(dnet,Xs,Ts,Xi,Ai);
         for i=1:400
             [dnet,Ys,Es,Xf,Yf,tr]  = adapt(dnet,mat2cell(inputs, size(inputs,1), ...
                 ones(1,size(inputs,2))),mat2cell(targets, size(targets,1), ...
                 ones(1,size(targets,2))));
         end;
-%         [dnet,Ys,Es,Xf,Yf,tr]  = train(dnet,mat2cell(inputs, size(inputs,1), ...
-%             ones(1,size(inputs,2))),mat2cell(targets, size(targets,1), ...
-%             ones(1,size(targets,2))),'useParallel','yes');
         errort(round) = mse(Es);
-    %end
     
     %% Update Input micro-epoch
     % shift-left
@@ -212,8 +182,6 @@ for round=1:rounds
     else
         Ad(:,end) = zeros(10,1);
     end;
-    % Ar(:,end) = [1;0];
-    % Ar(:,end) = ind2vec(reciv+1,2);
     Ar(:,end) = ind2vec(acceptance+1,2);
     Poff(:,end) = Pofft(:,end); 
     % if mod(round,5)==1       
@@ -243,10 +211,3 @@ for round=1:rounds
     drawnow limitrate
 end;
 drawnow
-%% Plot results
-% figure;
-% title('Dictator payoff'),xlabel('epochs'),ylabel('Payoff')
-% hold on
-% plot(index,'b');
-% plot(x2(2,:), 'r');
-% hold off
